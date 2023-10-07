@@ -1,5 +1,5 @@
 
-from asyncio import run
+
 import pandas as pd
 import streamlit as st
 from streamlit_option_menu import option_menu
@@ -12,8 +12,7 @@ import matplotlib.pyplot as plt
 import re
 import data
 import result 
-import numpy as np 
-import pytesseract
+
 
 # SETTING PAGE CONFIGURATIONS
 icon = Image.open("C://Users//Kiruthicka//Downloads//card.png.jpg")
@@ -21,7 +20,7 @@ st.set_page_config(page_title= "BizCardX: Extracting Business Card Data with OCR
                    page_icon= icon,
                    layout= "wide",
                    initial_sidebar_state= "expanded",
-                   menu_items={'About': """# This OCR app is created by *Jafar Hussain*!"""})
+                   menu_items={'About': """# This OCR app is created by *By Kiruthicka GP*!"""})
 st.markdown("<h1 style='text-align: center; color: white;'>BizCardX: Extracting Business Card Data with OCR</h1>", unsafe_allow_html=True)
 # SETTING-UP BACKGROUND IMAGE
 def setting_bg():
@@ -55,6 +54,8 @@ with st.sidebar:
         }
     )
 
+
+st.balloons()
 # Initializing EasyOCR reader
 reader = easyocr.Reader(['en'])
 
@@ -102,17 +103,17 @@ if selected == "Home":
 if selected == "Upload and Extract":
 
     st.markdown("### Upload a Business Card")
-    uploaded_card = st.file_uploader(os.path.join(os.getcwd(), "uploaded_cards"), label_visibility="collapsed", type=["png", "jpeg", "jpg"])
+    uploaded_card = st.file_uploader("upload here",label_visibility="collapsed",type=["png","jpeg","jpg"])
 
     if uploaded_card is not None:
 
         def save_card(uploaded_card):
-            with open(os.path.join("C://Users//Kiruthicka//Downloads", uploaded_card.name), "wb") as f:
+            with open(os.path.join(r"C:\Users\Kiruthicka\Downloads", uploaded_card.name), "wb") as f:
                 f.write(uploaded_card.getbuffer())   
         save_card(uploaded_card)
-
+        
         def image_preview(image,res): 
-            for (bbox, text) in res: 
+            for (bbox, text, prob) in res: 
               # unpack the bounding box
                 (tl, tr, br, bl) = bbox
                 tl = (int(tl[0]), int(tl[1]))
@@ -125,40 +126,39 @@ if selected == "Upload and Extract":
             plt.rcParams['figure.figsize'] = (15,15)
             plt.axis('off')
             plt.imshow(image) 
+        
 
-            # Displaying the uploaded card
-            col1,col2 = st.columns(2,gap="large")
-            with col1:
-                st.markdown("#     ")
-                st.markdown("#     ")
-                st.markdown("### You have uploaded the card")
-                st.image(image, format='PNG', width=300)  # Adjust the format and width as needed
-                st.write(image.shape)  # Check the shape of the image
-                st.write(image.dtype) 
+        # Displaying the uploaded card
+        col1,col2 = st.columns(2,gap="large")
+        with col1:
+            st.markdown("#     ")
+            st.markdown("#     ")
+            st.markdown("### You have uploaded the card")
+            st.image(uploaded_card)
 
-            with col2:
-                st.markdown("#     ")
-                st.markdown("#     ")
-                with st.spinner("Please wait processing image..."):
-                    st.set_option('deprecation.showPyplotGlobalUse', False)
-                    saved_img = os.path.join(os.getcwd(), "uploaded_cards", uploaded_card.name)
-                    image = cv2.imread(saved_img)
-                    res = reader.readtext(saved_img)
-                    st.markdown("### Image Processed and Data Extracted")
-                    st.pyplot(image_preview(image,res))
+        with col2:
+            st.markdown("#     ")
+            st.markdown("#     ")
+            with st.spinner("Please wait processing image..."):
+                st.set_option('deprecation.showPyplotGlobalUse', False)
+                saved_img = os.path.join(os.getcwd(), "C://Users//Kiruthicka//Downloads", uploaded_card.name)
+                image = cv2.imread(saved_img)
+                res = reader.readtext(saved_img)
+                st.markdown("### Image Processed and Data Extracted")
+                st.pyplot(image_preview(image,res))
 
-            #easy OCR
-            saved_img = os.getcwd()+ "\\" + "uploaded_cards"+ "\\"+ uploaded_card.name
-            result = reader.readtext(saved_img,detail = 0,paragraph=False)  
+        #easy OCR
+        saved_img = os.path.join(os.getcwd(), "C://Users//Kiruthicka//Downloads", uploaded_card.name)
+        result = reader.readtext(saved_img,detail = 0,paragraph=False)
 
-            # Converting image to binary to upload to SQL database
-            def img_to_binary(file):
-                # Convert image data to binary format
-                with open(file, 'rb') as file:
-                    binaryData = file.read()
-                return binaryData     
-
-            data = {"company_name" : [],
+        # Converting image to binary to upload to SQL database
+        def img_to_binary(file):
+            # Convert image data to binary format
+            with open(file, 'rb') as file:
+                binaryData = file.read()
+            return binaryData
+        
+        data = {"company_name" : [],
                 "card_holder" : [],
                 "designation" : [],
                 "mobile_number" :[],
@@ -169,70 +169,70 @@ if selected == "Upload and Extract":
                 "state" : [],
                 "pin_code" : [],
                 "image" : img_to_binary(saved_img)
-               } 
-            def get_data(res):
-                for ind,i in enumerate(res):
-                    # To get website url
-                    if "www " in i.lower() or "www." in i.lower():
-                        data["website"].append(i)
-                    elif "WWW" in i:
-                        data["website"] = res[4] +"." + res[5]
-                    # To get email ID
-                    elif "@" in i:
-                        data["email"].append(i)
-                    # To get mobile number
-                    elif "-" in i:
-                        data["mobile_number"].append(i)
-                        if len(data["mobile_number"]) ==2:
-                            data["mobile_number"] = " & ".join(data["mobile_number"])
-                    # To get company name  
-                    elif ind == len(res)-1:
-                        data["company_name"].append(i)
-                    # To get card holder name
-                    elif ind == 0:
-                        data["card_holder"].append(i)
-                    # To get designation
-                    elif ind == 1:
-                        data["designation"].append(i)
-                    # To get area
-                    if re.findall('^[0-9].+, [a-zA-Z]+',i):
-                        data["area"].append(i.split(',')[0])
-                    elif re.findall('[0-9] [a-zA-Z]+',i):
-                        data["area"].append(i)
-                    # To get city name
-                    match1 = re.findall('.+St , ([a-zA-Z]+).+', i)
-                    match2 = re.findall('.+St,, ([a-zA-Z]+).+', i)
-                    match3 = re.findall('^[E].*',i)
-                    if match1:
-                        data["city"].append(match1[0])
-                    elif match2:
-                        data["city"].append(match2[0])
-                    elif match3:
-                        data["city"].append(match3[0])
-                    # To get state
-                    state_match = re.findall('[a-zA-Z]{9} +[0-9]',i)
-                    if state_match:
-                        data["state"].append(i[:9])
-                    elif re.findall('^[0-9].+, ([a-zA-Z]+);',i):
-                        data["state"].append(i.split()[-1])
-                    if len(data["state"])== 2:
-                        data["state"].pop(0)
-                    # To get pincode        
-                    if len(i)>=6 and i.isdigit():
-                        data["pin_code"].append(i)
-                    elif re.findall('[a-zA-Z]{9} +[0-9]',i):
-                        data["pin_code"].append(i[10:])
-            get_data(result)  
+               }
+        def get_data(res):
+            for ind,i in enumerate(res):
+                # To get website url
+                if "www " in i.lower() or "www." in i.lower():
+                    data["website"].append(i)
+                elif "WWW" in i:
+                    data["website"] = res[4] +"." + res[5]
+                # To get email ID
+                elif "@" in i:
+                    data["email"].append(i)
+                # To get mobile number
+                elif "-" in i:
+                    data["mobile_number"].append(i)
+                    if len(data["mobile_number"]) ==2:
+                        data["mobile_number"] = " & ".join(data["mobile_number"])
+                # To get company name  
+                elif ind == len(res)-1:
+                    data["company_name"].append(i)
+                # To get card holder name
+                elif ind == 0:
+                    data["card_holder"].append(i)
+                # To get designation
+                elif ind == 1:
+                    data["designation"].append(i)
+                # To get area
+                if re.findall('^[0-9].+, [a-zA-Z]+',i):
+                    data["area"].append(i.split(',')[0])
+                elif re.findall('[0-9] [a-zA-Z]+',i):
+                    data["area"].append(i)
+                # To get city name
+                match1 = re.findall('.+St , ([a-zA-Z]+).+', i)
+                match2 = re.findall('.+St,, ([a-zA-Z]+).+', i)
+                match3 = re.findall('^[E].*',i)
+                if match1:
+                    data["city"].append(match1[0])
+                elif match2:
+                    data["city"].append(match2[0])
+                elif match3:
+                    data["city"].append(match3[0])
+                # To get state
+                state_match = re.findall('[a-zA-Z]{9} +[0-9]',i)
+                if state_match:
+                     data["state"].append(i[:9])
+                elif re.findall('^[0-9].+, ([a-zA-Z]+);',i):
+                    data["state"].append(i.split()[-1])
+                if len(data["state"])== 2:
+                    data["state"].pop(0)
+                # To get pincode        
+                if len(i)>=6 and i.isdigit():
+                    data["pin_code"].append(i)
+                elif re.findall('[a-zA-Z]{9} +[0-9]',i):
+                    data["pin_code"].append(i[10:])
+        get_data(result)         
 
-             # Function to create dataframe
-            def create_df(data):
-                df = pd.DataFrame(data)
-                return df
-            df = create_df(data)
-            st.success("### Data Extracted!")
-            st.write(df)
+        # Function to create dataframe
+        def create_df(data):
+            df = pd.DataFrame(data)
+            return df
+        df = create_df(data)
+        st.success("### Data Extracted!")
+        st.write(df)
             
-            if st.button("Upload to Database"):
+        if st.button("Upload to Database"):
                 for i,row in df.iterrows():
                     # here %s means string values 
                     sql = """INSERT INTO card_data(company_name,card_holder,designation,mobile_number,email,website,area,city,state,pin_code,image)
@@ -295,5 +295,7 @@ if selected == "Modify":
     if st.button("View updated data"):
         mycursor.execute("select company_name,card_holder,designation,mobile_number,email,website,area,city,state,pin_code from card_data")
         updated_df = pd.DataFrame(mycursor.fetchall(),columns=["Company_Name","Card_Holder","Designation","Mobile_Number","Email","Website","Area","City","State","Pin_Code"])
+        st.write(updated_df)                           
+
         st.write(updated_df)                           
 
